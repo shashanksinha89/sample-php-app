@@ -1,0 +1,50 @@
+stages:
+  - build
+  - validate
+  - deploy
+
+variables:
+  CONTAINER_IMAGE: shashanksinha/php
+  CONTAINER_IMAGE_LATEST: ${CONTAINER_IMAGE}:${CI_PIPELINE_ID}
+  CI_REGISTRY: index.docker.io  # container registry URL
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://localhost:2375  # required since we use dind
+
+
+build:
+  stage: build
+  image: docker:latest
+  services:
+  - docker:dind
+  before_script:
+    - echo "FQDN is ${DB_SERVER}"
+    - echo "dbname is ${DB_NAME}"
+    - echo "username is ${DB_USERNAME}"
+    - echo "password is ${DB_PASSWORD}"
+    - sed -i -e "s/fqdn/${DB_SERVER}/g" app-code/config.php
+    - sed -i -e "s/dbname/${DB_NAME}/g" app-code/config.php
+    - sed -i -e "s/username/${DB_USERNAME}/g" app-code/config.php
+    - sed -i -e "s/password/${DB_PASSWORD}/g" app-code/config.php
+    - cat app-code/config.php
+
+  script:
+    - echo "Building Dockerfile-based application..."
+    - docker build -t ${CONTAINER_IMAGE_LATEST} .
+    - echo "username is $CI_REGISTRY_USER and password is $CI_REGISTRY_PASSWORD"
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+    - echo "Pushing to the Container Registry..."
+    - docker push ${CONTAINER_IMAGE_LATEST}
+
+validate:
+  stage: validate
+  image: docker:latest
+  script:
+    - echo "Run test cases"
+  
+deploy:
+  stage: deploy
+  image: linkyard/docker-helm
+  script:
+    - helm init --upgrade
+    - helm repo add stable https://kubernetes-charts.storage.googleapis.com
+    - helm upgrade --install  php-app --namespace default --wait --set image.tag=${CI_PIPELINE_ID} --set replicaCount=2 helm-data/
