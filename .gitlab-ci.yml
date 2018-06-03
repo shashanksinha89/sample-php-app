@@ -25,7 +25,6 @@ build:
     - sed -i -e "s/dbname/${DB_NAME}/g" app-code/config.php
     - sed -i -e "s/username/${DB_USERNAME}/g" app-code/config.php
     - sed -i -e "s/password/${DB_PASSWORD}/g" app-code/config.php
-    - cat app-code/config.php
 
   script:
     - echo "Building Dockerfile-based application..."
